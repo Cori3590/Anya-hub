@@ -1,0 +1,10 @@
+{
+  "name": "Remix: Sarai_OS 3.1- hub",
+  "description": "Create and interact with your own AI-powered anime companion featuring high-quality image generation, voice synthesis, and dynamic personality traits.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
