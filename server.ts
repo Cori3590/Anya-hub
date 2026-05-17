@@ -24,11 +24,17 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
 
-  // Initialize Gemini
-  const genAI = new GoogleGenAI({ 
-    apiKey: process.env.GEMINI_API_KEY || "",
-    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-  });
+  // Helper to get Gemini Client with dynamic key
+  const getGeminiClient = (req: express.Request) => {
+    const key = (req.headers['x-gemini-key'] as string) || process.env.GEMINI_API_KEY;
+    if (!key) {
+        throw new Error("Gemini API Key missing. Configure in settings.");
+    }
+    return new GoogleGenAI({ 
+        apiKey: key,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+  };
 
   // Hybrid Chat API
   app.post("/api/chat", async (req, res) => {
@@ -47,6 +53,7 @@ async function startServer() {
         systemInstruction += `\n\n[CURRENT GAME STATE]\n${gameContext}`;
     }
 
+    const geminiClient = getGeminiClient(req);
     try {
         if (provider === 'gemini') {
             const getChatResponse = async (targetModel: string) => {
@@ -72,7 +79,7 @@ async function startServer() {
                     };
                 });
 
-                return await genAI.models.generateContent({
+                return await geminiClient.models.generateContent({
                     model: targetModel,
                     contents,
                     config: {
@@ -103,7 +110,7 @@ async function startServer() {
             res.json({ text: result?.text || "" });
 
         } else if (provider === 'openrouter') {
-            const openRouterKey = process.env.OPENROUTER_API_KEY;
+            const openRouterKey = (req.headers['x-openrouter-key'] as string) || process.env.OPENROUTER_API_KEY;
             
             const performOpenRouterRequest = async () => {
                 if (!openRouterKey) {
@@ -193,7 +200,7 @@ async function startServer() {
                                 return { role: m.role === 'user' ? 'user' : 'model', parts };
                             });
 
-                            return await genAI.models.generateContent({
+                            return await geminiClient.models.generateContent({
                                 model: "gemini-3.1-flash-lite",
                                 contents,
                                 config: { systemInstruction }
@@ -221,6 +228,7 @@ async function startServer() {
   // Hybrid Image Gen
   app.post("/api/generate-image", async (req, res) => {
     const { prompt, referenceImage, aspect, model } = req.body;
+    const geminiClient = getGeminiClient(req);
     try {
         const parts: any[] = [{ text: prompt }];
         if (referenceImage) {
@@ -233,7 +241,7 @@ async function startServer() {
         else if (modelId.includes("flash")) modelId = "gemini-3.1-flash-image-preview";
 
         const getImage = async (targetId: string) => {
-            return await genAI.models.generateContent({
+            return await geminiClient.models.generateContent({
                 model: targetId,
                 contents: [{ role: 'user', parts }],
                 config: { imageConfig: { aspectRatio: aspect || "1:1" } }
@@ -264,8 +272,9 @@ async function startServer() {
   // GM Adventure Turn
   app.post("/api/adventure-turn", async (req, res) => {
     const { historyContext, action, stats, profile } = req.body;
+    const geminiClient = getGeminiClient(req);
     try {
-        const result: any = await genAI.models.generateContent({
+        const result: any = await geminiClient.models.generateContent({
             model: "gemini-3.1-pro-preview",
             contents: [{ role: 'user', parts: [{ text: `Stats: ${JSON.stringify(stats)}\nHistory: ${historyContext}\nAction: ${action}` }] }],
             config: {
@@ -297,9 +306,10 @@ async function startServer() {
   // Chronicle Update
   app.post("/api/update-chronicle", async (req, res) => {
     const { lastUserMsg, lastAiMsg } = req.body;
+    const geminiClient = getGeminiClient(req);
     try {
         const prompt = `Extract a 1-sentence memory from this chat. User: ${lastUserMsg}. AI: ${lastAiMsg}. If trivial, return "NULL".`;
-        const result: any = await genAI.models.generateContent({
+        const result: any = await geminiClient.models.generateContent({
             model: "gemini-3.1-flash-lite",
             contents: [{ role: 'user', parts: [{ text: prompt }] }]
         });
@@ -313,10 +323,11 @@ async function startServer() {
   // History Summarization
   app.post("/api/summarize-history", async (req, res) => {
     const { messages } = req.body;
+    const geminiClient = getGeminiClient(req);
     try {
         const historyText = messages.slice(-50).map((m: any) => `${m.role}: ${m.content}`).join("\n");
         const prompt = `Summarize this conversation concisely:\n${historyText}`;
-        const result: any = await genAI.models.generateContent({
+        const result: any = await geminiClient.models.generateContent({
             model: "gemini-3.1-flash-lite",
             contents: prompt
         });
@@ -329,8 +340,9 @@ async function startServer() {
   // Speech Generation (TTS)
   app.post("/api/generate-speech", async (req, res) => {
     const { text, voice } = req.body;
+    const geminiClient = getGeminiClient(req);
     try {
-        const result: any = await genAI.models.generateContent({
+        const result: any = await geminiClient.models.generateContent({
             model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text }] }],
             config: {

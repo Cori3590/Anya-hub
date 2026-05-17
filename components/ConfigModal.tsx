@@ -18,7 +18,8 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
     const [chatProvider, setChatProvider] = React.useState(localStorage.getItem('waifu_provider_chat') || 'gemini');
     const [imageModel, setImageModel] = React.useState(localStorage.getItem('waifu_model_image') || 'gemini-3-pro-image-preview');
     const [voiceModel, setVoiceModel] = React.useState(localStorage.getItem('waifu_voice') || 'Kore');
-    const [customApiKey, setCustomApiKey] = React.useState(localStorage.getItem('custom_gemini_api_key') || '');
+    const [customGeminiKey, setCustomGeminiKey] = React.useState(localStorage.getItem('custom_gemini_api_key') || '');
+    const [openRouterKey, setOpenRouterKey] = React.useState(localStorage.getItem('custom_openrouter_api_key') || '');
 
     const [probeResult, setProbeResult] = React.useState<number | null>(null);
     const [isProbing, setIsProbing] = React.useState(false);
@@ -66,10 +67,16 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
         localStorage.setItem('waifu_provider_chat', chatProvider);
         localStorage.setItem('waifu_model_image', imageModel);
         localStorage.setItem('waifu_voice', voiceModel);
-        if (customApiKey.trim()) {
-            localStorage.setItem('custom_gemini_api_key', customApiKey.trim());
+        if (customGeminiKey.trim()) {
+            localStorage.setItem('custom_gemini_api_key', customGeminiKey.trim());
         } else {
             localStorage.removeItem('custom_gemini_api_key');
+        }
+
+        if (openRouterKey.trim()) {
+            localStorage.setItem('custom_openrouter_api_key', openRouterKey.trim());
+        } else {
+            localStorage.removeItem('custom_openrouter_api_key');
         }
         // Save appearance text changes too, but don't touch avatarUrl
         onSave({ ...profile, appearance });
@@ -83,10 +90,16 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
         localStorage.setItem('waifu_model_chat', chatModel);
         localStorage.setItem('waifu_model_image', imageModel);
         localStorage.setItem('waifu_voice', voiceModel);
-        if (customApiKey.trim()) {
-            localStorage.setItem('custom_gemini_api_key', customApiKey.trim());
+        if (customGeminiKey.trim()) {
+            localStorage.setItem('custom_gemini_api_key', customGeminiKey.trim());
         } else {
             localStorage.removeItem('custom_gemini_api_key');
+        }
+
+        if (openRouterKey.trim()) {
+            localStorage.setItem('custom_openrouter_api_key', openRouterKey.trim());
+        } else {
+            localStorage.removeItem('custom_openrouter_api_key');
         }
 
         try {
@@ -264,25 +277,46 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-[10px] text-cyan-600 mb-1">CUSTOM GEMINI API KEY (Optional)</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="password" 
-                                        value={customApiKey} 
-                                        onChange={(e) => setCustomApiKey(e.target.value)} 
-                                        placeholder="AIzaSy..." 
-                                        className="flex-1 bg-black border border-cyan-700 text-cyan-400 p-2 text-base placeholder-cyan-900"
-                                    />
-                                    <button 
-                                        onClick={() => setCustomApiKey('')}
-                                        className="px-4 border border-red-800 text-red-500 hover:bg-red-900/30 text-xs font-bold"
-                                        title="Clear Key"
-                                    >
-                                        CLEAR
-                                    </button>
+                                <label className="block text-[10px] text-cyan-600 mb-1 font-bold">UPLINK CREDENTIALS (Sovereign Control)</label>
+                                <div className="space-y-4 bg-cyan-950/20 p-3 border border-cyan-900">
+                                    <div>
+                                        <label className="block text-[8px] text-cyan-700 mb-1">GEMINI_API_KEY (Google Cloud)</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="password" 
+                                                value={customGeminiKey} 
+                                                onChange={(e) => setCustomGeminiKey(e.target.value)} 
+                                                placeholder="AIzaSy..." 
+                                                className="flex-1 bg-black border border-cyan-700 text-cyan-400 p-2 text-xs placeholder-cyan-900"
+                                            />
+                                            <button 
+                                                onClick={() => setCustomGeminiKey('')}
+                                                className="px-2 border border-red-800 text-red-500 hover:bg-red-900/30 text-[10px] font-bold"
+                                            >
+                                                CLR
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[8px] text-cyan-700 mb-1">OPENROUTER_API_KEY (Hybrid Engine)</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="password" 
+                                                value={openRouterKey} 
+                                                onChange={(e) => setOpenRouterKey(e.target.value)} 
+                                                placeholder="sk-or-v1-..." 
+                                                className="flex-1 bg-black border border-cyan-700 text-cyan-400 p-2 text-xs placeholder-cyan-900"
+                                            />
+                                            <button 
+                                                onClick={() => setOpenRouterKey('')}
+                                                className="px-2 border border-red-800 text-red-500 hover:bg-red-900/30 text-[10px] font-bold"
+                                            >
+                                                CLR
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] text-cyan-800 italic uppercase">{">>"} Warning: Keys are stored in local storage for session persistence.</p>
                                 </div>
-                                <p className="text-[9px] text-cyan-700 mt-1">Leave blank to use default platform key. Required for TTS on public links.</p>
-                                <p className="text-[9px] text-amber-600 mt-1 font-bold">WARNING: If you get a 403 Forbidden error, ensure your API key does NOT have HTTP Referrer restrictions in Google Cloud Console, or add this app's URL to the allowed list.</p>
                             </div>
                              <button 
                                  onClick={() => window.location.reload()} 

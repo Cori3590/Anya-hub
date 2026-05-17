@@ -102,10 +102,17 @@ const callHybridChat = async (payload: any, signal?: AbortSignal) => {
         console.warn(`>> LARGE PAYLOAD DETECTED: ${(body.length / 1024 / 1024).toFixed(2)} MB. STRIPPING OLDER IMAGES...`);
     }
 
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
+    const customOpenRouterKey = localStorage.getItem('custom_openrouter_api_key');
+
     try {
         const response = await fetch("/api/chat", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "x-gemini-key": customGeminiKey || "",
+                "x-openrouter-key": customOpenRouterKey || ""
+            },
             body,
             signal: signal || controller.signal
         });
@@ -140,10 +147,14 @@ const callHybridChat = async (payload: any, signal?: AbortSignal) => {
 
 export const generateWaifuAvatar = async (profile: WaifuProfile, referenceImage?: string): Promise<string | null> => {
     const model = localStorage.getItem('waifu_model_image') || 'gemini-3-pro-image-preview';
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
     const prompt = `Atmospheric portrait of ${profile.name}. Appearance: ${profile.appearance}. Style: Cyberpunk.`;
     const res = await fetch("/api/generate-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": customGeminiKey || "" 
+        },
         body: JSON.stringify({ prompt, referenceImage, model })
     });
     const data = await res.json();
@@ -152,10 +163,14 @@ export const generateWaifuAvatar = async (profile: WaifuProfile, referenceImage?
 
 export const generateSceneImage = async (description: string, isCombat: boolean): Promise<string | null> => {
     const model = localStorage.getItem('waifu_model_image') || 'gemini-3-pro-image-preview';
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
     const prompt = `Cyberpunk wasteland scene: ${description}. ${isCombat ? "Intense combat." : "Atmospheric exploration."}`;
     const res = await fetch("/api/generate-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": customGeminiKey || "" 
+        },
         body: JSON.stringify({ prompt, model })
     });
     const data = await res.json();
@@ -171,9 +186,13 @@ export const generateAdventureTurn = async (
     attachments: Attachment[],
     signal?: AbortSignal
 ): Promise<any> => {
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
     const res = await fetch("/api/adventure-turn", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": customGeminiKey || "" 
+        },
         body: JSON.stringify({ historyContext, action, stats, profile, chronicle }),
         signal
     });
@@ -181,9 +200,13 @@ export const generateAdventureTurn = async (
 };
 
 export const updateChronicle = async (lastUserMsg: string, lastAiMsg: string): Promise<string | null> => {
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
     const res = await fetch("/api/update-chronicle", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": customGeminiKey || "" 
+        },
         body: JSON.stringify({ lastUserMsg, lastAiMsg })
     });
     const data = await res.json();
@@ -191,9 +214,13 @@ export const updateChronicle = async (lastUserMsg: string, lastAiMsg: string): P
 };
 
 export const summarizeChatHistory = async (messages: Message[]): Promise<string | null> => {
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
     const res = await fetch("/api/summarize-history", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": customGeminiKey || "" 
+        },
         body: JSON.stringify({ messages })
     });
     const data = await res.json();
@@ -202,9 +229,13 @@ export const summarizeChatHistory = async (messages: Message[]): Promise<string 
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
     const voice = localStorage.getItem('waifu_voice') || 'Kore';
+    const customGeminiKey = localStorage.getItem('custom_gemini_api_key');
     const res = await fetch("/api/generate-speech", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": customGeminiKey || "" 
+        },
         body: JSON.stringify({ text, voice })
     });
     const data = await res.json();
