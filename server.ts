@@ -20,18 +20,23 @@ const WOLF_RHYTHM_PROTOCOL = `
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json({ limit: '50mb' }));
 
   // Helper to get Gemini Client with dynamic key
   const getGeminiClient = (req: express.Request) => {
-    const key = (req.headers['x-gemini-key'] as string) || process.env.GEMINI_API_KEY;
-    if (!key) {
-        throw new Error("Gemini API Key missing. Configure in settings.");
+    const headerKey = req.headers['x-gemini-key'] as string;
+    const envKey = process.env.GEMINI_API_KEY;
+    const key = headerKey || envKey;
+
+    if (!key || key.trim() === "") {
+        console.error("[AUTH_ERROR] No Gemini API key found in headers or environment.");
+        throw new Error("Gemini API Key missing. Securely provide one in the Config panel (Sovereign Control) or via environment variables.");
     }
+    
     return new GoogleGenAI({ 
-        apiKey: key,
+        apiKey: key.trim(),
         httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
     });
   };
@@ -92,6 +97,9 @@ async function startServer() {
             try {
                 // Determine model ID - keep 3.x IDs for simulation context
                 let modelId = model || "gemini-3.1-pro-preview";
+                if (modelId.includes('/') || !modelId.startsWith('gemini')) {
+                    modelId = "gemini-3.1-pro-preview"; 
+                }
                 
                 result = await getChatResponse(modelId);
             } catch (e: any) {
@@ -99,10 +107,12 @@ async function startServer() {
                 // Auto-fallback for quota issues or missing endpoints
                 if (e.message.includes("429") || e.message.includes("RESOURCE_EXHAUSTED") || e.message.includes("quota")) {
                     console.warn(`Model ${model} quota hit, falling back...`);
-                    result = await getChatResponse("gemini-3.1-flash-lite"); 
+                    try { result = await getChatResponse("gemini-3.1-flash-lite"); }
+                    catch(e2) { result = await getChatResponse("gemini-1.5-flash"); }
                 } else if (e.message.includes("No endpoints found") || e.message.includes("404") || e.message.includes("not found")) {
-                    console.warn(`Model ${model} not found in this region, falling back to flash...`);
-                    result = await getChatResponse("gemini-3.1-flash-lite");
+                    console.warn(`Model ${model} not found in this region or API key lacks access, falling back to flash...`);
+                    try { result = await getChatResponse("gemini-3.1-flash-lite"); }
+                    catch(e2) { result = await getChatResponse("gemini-1.5-flash"); }
                 } else {
                     throw e;
                 }
@@ -235,9 +245,9 @@ async function startServer() {
             parts.push({ inlineData: { mimeType: 'image/png', data: referenceImage } });
         }
 
-        let modelId = model || "gemini-3.1-pro-image-preview";
+        let modelId = model || "gemini-3-pro-image-preview";
         // Map to specific image preview IDs
-        if (modelId.includes("pro")) modelId = "gemini-3.1-pro-image-preview";
+        if (modelId.includes("pro")) modelId = "gemini-3-pro-image-preview";
         else if (modelId.includes("flash")) modelId = "gemini-3.1-flash-image-preview";
 
         const getImage = async (targetId: string) => {
@@ -253,7 +263,8 @@ async function startServer() {
             response = await getImage(modelId);
         } catch (e: any) {
             console.warn(`Model ${modelId} image gen failed, trying fallback...`);
-            response = await getImage("gemini-3.1-flash-image-preview");
+            try { response = await getImage("gemini-3.1-flash-image-preview"); }
+            catch(fallbackErr) { response = await getImage("gemini-2.5-flash-image"); }
         }
 
         const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
@@ -274,22 +285,31 @@ async function startServer() {
     const { historyContext, action, stats, profile } = req.body;
     const geminiClient = getGeminiClient(req);
     try {
-        const result: any = await geminiClient.models.generateContent({
-            model: "gemini-3.1-pro-preview",
-            contents: [{ role: 'user', parts: [{ text: `Stats: ${JSON.stringify(stats)}\nHistory: ${historyContext}\nAction: ${action}` }] }],
-            config: {
-                systemInstruction: `You are the Game Master for a wasteland RPG. Player: Architect. Companion: ${profile.name}. Respond ONLY in JSON.`,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        text: { type: Type.STRING },
-                        speaker: { type: Type.STRING },
-                        choices: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING } } } }
+        const getAdventureResponse = async (modelId: string) => {
+            return await geminiClient.models.generateContent({
+                model: modelId,
+                contents: [{ role: 'user', parts: [{ text: `Stats: ${JSON.stringify(stats)}\nHistory: ${historyContext}\nAction: ${action}` }] }],
+                config: {
+                    systemInstruction: `You are the Game Master for a wasteland RPG. Player: Architect. Companion: ${profile.name}. Respond ONLY in JSON.`,
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            text: { type: Type.STRING },
+                            speaker: { type: Type.STRING },
+                            choices: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING } } } }
+                        }
                     }
                 }
-            }
-        });
+            });
+        };
+
+        let result: any;
+        try {
+            result = await getAdventureResponse("gemini-3.1-pro-preview");
+        } catch (e) {
+            result = await getAdventureResponse("gemini-2.5-flash");
+        }
         const text = result?.text || "{}";
         try {
             res.json(JSON.parse(text));
@@ -309,10 +329,12 @@ async function startServer() {
     const geminiClient = getGeminiClient(req);
     try {
         const prompt = `Extract a 1-sentence memory from this chat. User: ${lastUserMsg}. AI: ${lastAiMsg}. If trivial, return "NULL".`;
-        const result: any = await geminiClient.models.generateContent({
-            model: "gemini-3.1-flash-lite",
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
-        });
+        let result;
+        try {
+            result = await geminiClient.models.generateContent({ model: "gemini-3.1-flash-lite", contents: prompt });
+        } catch(e) {
+            result = await geminiClient.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+        }
         const text = result?.text?.trim() || "";
         res.json({ summary: text === "NULL" ? null : text });
     } catch (e: any) {
@@ -327,10 +349,12 @@ async function startServer() {
     try {
         const historyText = messages.slice(-50).map((m: any) => `${m.role}: ${m.content}`).join("\n");
         const prompt = `Summarize this conversation concisely:\n${historyText}`;
-        const result: any = await geminiClient.models.generateContent({
-            model: "gemini-3.1-flash-lite",
-            contents: prompt
-        });
+        let result;
+        try {
+            result = await geminiClient.models.generateContent({ model: "gemini-3.1-flash-lite", contents: prompt });
+        } catch(e) {
+            result = await geminiClient.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+        }
         res.json({ summary: result?.text?.trim() || "" });
     } catch (e: any) {
         res.status(500).json({ error: e.message });
@@ -342,14 +366,23 @@ async function startServer() {
     const { text, voice } = req.body;
     const geminiClient = getGeminiClient(req);
     try {
-        const result: any = await geminiClient.models.generateContent({
-            model: "gemini-3.1-flash-tts-preview",
-            contents: [{ parts: [{ text }] }],
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice || "Kore" } } }
-            }
-        });
+        const getSpeech = async (modelId: string) => {
+            return await geminiClient.models.generateContent({
+                model: modelId,
+                contents: [{ parts: [{ text }] }],
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice || "Kore" } } }
+                }
+            });
+        };
+
+        let result: any;
+        try {
+            result = await getSpeech("gemini-3.1-flash-tts-preview");
+        } catch (e) {
+            result = await getSpeech("gemini-2.5-flash");
+        }
         const audioPart = result?.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
         res.json({ audio: audioPart?.inlineData?.data || null });
     } catch (e: any) {

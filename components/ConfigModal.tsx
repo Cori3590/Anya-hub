@@ -187,8 +187,12 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
                             <div>
                                 <label className="block text-[10px] text-cyan-600 mb-1">AI PROVIDER (Switch-Node)</label>
                                 <select value={chatProvider} onChange={(e) => {
-                                    setChatProvider(e.target.value);
+                                    const p = e.target.value;
+                                    setChatProvider(p);
                                     setProbeResult(null);
+                                    // Reset model to default for new provider to prevent cross-provider 404s
+                                    if (p === 'gemini') setChatModel('gemini-3.1-pro-preview');
+                                    else setChatModel('openai/gpt-oss-120b:free');
                                 }} className="w-full bg-black border border-cyan-700 text-cyan-400 p-2 text-base">
                                     <option value="gemini">GOOGLE GEMINI (Native)</option>
                                     <option value="openrouter">OPENROUTER (Hybrid Engine)</option>
@@ -227,11 +231,7 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
                                             setProbeResult(null);
                                         }} className="w-full bg-black border border-cyan-700 text-cyan-400 p-2 text-base">
                                             <option value="openai/gpt-oss-120b:free">GPT-OSS 120B (Free)</option>
-                                            <option value="nvidia/nemotron-3-super-120b-a12b:free">Nemotron-3 Super 120B (Free)</option>
                                             <option value="poolside/laguna-m.1:free">Laguna M.1 (Free)</option>
-                                            <option value="z-ai/glm-4.5-air:free">GLM-4.5 Air (Free)</option>
-                                            <option value="minimax/minimax-m2.5:free">MiniMax M2.5 (Free)</option>
-                                            <option value="poolside/laguna-xs.2:free">Laguna XS.2 (Free)</option>
                                             <option value="baidu/cobuddy:free">Baidu CoBuddy (Free)</option>
                                             <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">Nemotron-3 Nano Omni (Free)</option>
                                         </select>
@@ -239,11 +239,7 @@ export const ConfigModal: React.FC<Props> = ({ profile, onSave, onClose, onReset
                                             {(() => {
                                                 switch(chatModel) {
                                                     case 'openai/gpt-oss-120b:free': return '[BALANCED] Latency: 1.8s | TPS: 40 | Tier: Logic-Balanced conversational cluster.';
-                                                    case 'nvidia/nemotron-3-super-120b-a12b:free': return '[HEAVY] Latency: 4.2s | TPS: 15 | Tier: Deep Reasoner. High-fidelity logic.';
                                                     case 'poolside/laguna-m.1:free': return '[CODE] Latency: 0.9s | TPS: 85 | Tier: System-Logical. Rigid rule following.';
-                                                    case 'z-ai/glm-4.5-air:free': return '[VERSATILE] Latency: 1.5s | TPS: 55 | Tier: Generalist. Balanced creativity.';
-                                                    case 'minimax/minimax-m2.5:free': return '[CREATIVE] Latency: 2.1s | TPS: 35 | Tier: Nuance-RP. High density character data.';
-                                                    case 'poolside/laguna-xs.2:free': return '[INSTANT] Latency: 0.3s | TPS: 150+ | Tier: Execution-Core. Real-time feedback.';
                                                     case 'baidu/cobuddy:free': return '[SOCIAL] Latency: 1.2s | TPS: 50 | Tier: Empathetic-Link. Nuanced social personality.';
                                                     case 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': return '[MULTI] Latency: 0.8s | TPS: 75 | Tier: Omni-Vision. Small-frame multimodal engine.';
                                                     default: return 'Hybrid AI cluster connected through the OpenRouter mesh.';
