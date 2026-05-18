@@ -19,7 +19,7 @@ const WOLF_RHYTHM_PROTOCOL = `
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '50mb' }));
 
